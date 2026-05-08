@@ -7,10 +7,12 @@ package com.fhu86918.educastur.tienda;
 import java.io.BufferedReader;
 import java.io.BufferedWriter; 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.net.ContentHandlerFactory;
 import java.sql.SQLOutput;
 import java.time.LocalDate;
@@ -28,6 +30,10 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 import jdk.management.jfr.FlightRecorderMXBean;
 import java.io.Serializable;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 //</editor-fold>
 
 /**
@@ -35,14 +41,14 @@ import java.io.Serializable;
  * @author 1dawd
  */
 // <editor-fold defaultstate="collapsed" desc="CLASE TIENDA 2026">
-public class Tienda2026 implements Serializable {
+public class Tienda implements Serializable {
     //Para poder serializar la tienda hay que borrar la declaración de Scanner de debajo, y ponerla en cada metodo y menu que necesite de uno
     //porque si no la tienda no se podrá serializar correctamente.
 
     private static transient Scanner sc = new Scanner(System.in);
-    private ArrayList<Pedido> pedidos;
-    private HashMap<String, Articulo> articulos;
-    private HashMap<String, Cliente> clientes;
+    public ArrayList <Pedido> pedidos;
+    public HashMap <String, Articulo> articulos;
+    public HashMap <String, Cliente> clientes;
 
     public static Scanner getSc() {
         return sc;
@@ -61,7 +67,7 @@ public class Tienda2026 implements Serializable {
     }
     // </editor-fold>
 
-    public Tienda2026() {
+    public Tienda() {
         pedidos = new ArrayList();
         articulos = new HashMap();
         clientes = new HashMap();
@@ -72,21 +78,125 @@ public class Tienda2026 implements Serializable {
 
         //La primera vez que ejecute esto con el Backup de Tienda Completa, utilizar el carga datos, llamar al cargadatos, luego al menú, y luego al backup.
         //La segunda vez, no ejecutaremos el cargadatos, sino el metodo importar tienda, luego el menú, y luego el backup.
-        Tienda2026 t2026 = new Tienda2026();
-        //t2026.cargaDatos();
-        t2026.leeClientes();
-        //t2026.guardaClientes();
-        //t2026.guardaArticulosPorSeccion1();
-        //t2026.leeArticulosPorSeccion();
-        //t2026.menu();
+        Tienda t = new Tienda();
+        //t.cargaDatos();
+        //t.leeClientes();
+        //t.guardaClientes();
+        //t.guardaArticulosPorSeccion1();
+        //t.leeArticulosPorSeccion();
+        //t.menu();
+        t.jdbcLeeArticulos();
+        t.jdbcGuardaArticulos();
 
     }
 
 //</editor-fold>
     
+ private void jdbcLeeArticulos(){
+        Statement sentencia;
+        ArrayList <Articulo> articulosAux = new ArrayList();
+        /*LEER ARTICULOS DESDE LA BD */
+        
+        String consultaSQL ="SELECT * FROM articulos";      
+        try {
+            /* Usando la clase Conexion SE CREA UN OBJETO DE TIPO Statement sobre el que se van 
+            a lanzar consultas SQL.
+               Despues se lanza la consulta SQL a traves del Statement y se recogen los registros
+            en un ResultSet (Conjunto de registros resultado de una consulta SQL)
+            */ 
+            sentencia = Conexion.obtener().createStatement();
+            ResultSet rs=sentencia.executeQuery(consultaSQL);
+            while (rs.next())
+            {
+                articulosAux.add(new Articulo(rs.getString(1),rs.getString(2),rs.getInt(3),rs.getDouble(4)));
+            }
+            System.out.println("ARTICULOS importados desde MySQL correctamente");
+        }catch (SQLException e) {
+                System.out.println(e.toString());
+        } catch (ClassNotFoundException ex) {
+            System.getLogger(Tienda.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+        }
+        
+        articulosAux.stream().forEach(System.out::println);
+}
+ 
+ private void jdbcGuardaArticulos(){
+        String consulta;
+        
+        for (Articulo a:articulos.values()){
+            consulta = "INSERT INTO `articulos` (`idArticulo`, `descripcion`, `existencias`, `pvp`)"
+                    + " VALUES ('" + a.getIdArticulo()+"', '"+a.getDescripcion()+"', '"+a.getExistencias()+"', '" + a.getPvp()+"')";
+            try {
+                PreparedStatement ps = Conexion.obtener().prepareStatement(consulta);
+                ps.executeUpdate();
+            } catch (ClassNotFoundException | SQLException e) {
+                System.out.println(e.toString());
+            }
+        }
+        System.out.println("ARTICULOS exportados a MySQL correctamente");
+    }
+    
+   private void jdbcGuardaClientes(){
+        String consulta;
+        
+        for (Cliente c:clientes.values()){
+            consulta= "INSERT INTO `clientes` (`idCliente`, `nombre`, `telefono`, `email`)"
+                    + " VALUES ('" + c.getIdCliente()+"', '"+c.getNombre()+"','"+c.getTelefono()+"' , '" +c.getEmail()+"')";
+            try {
+                PreparedStatement ps = Conexion.obtener().prepareStatement(consulta);
+                ps.executeUpdate();
+            } catch (ClassNotFoundException | SQLException e) {
+                System.out.println(e.toString());
+            }
+        }
+        System.out.println("CLIENTES exportados a MySQL correctamente");
+    }
+    
+    private void jdbcLeeClientes(){
+        Statement sentencia;
+        ArrayList <Cliente> clientesAux = new ArrayList();
+      
+        
+        String consultaSQL ="SELECT * FROM clientes";      
+        try {
+            sentencia = Conexion.obtener().createStatement();
+            ResultSet rs=sentencia.executeQuery(consultaSQL);
+            while (rs.next())
+            {
+                clientesAux.add(new Cliente(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4)));
+            }
+            System.out.println("CLIENTES importados desde MySQL correctamente");
+        }catch (ClassNotFoundException | SQLException e) {
+                System.out.println(e.toString());
+        }
+        
+        clientesAux.stream().forEach(System.out::println);
+    }
 
+    
+    private void jdbcGuardaPedidos(){
+        String consulta;
+        
+        for (Pedido p : pedidos){
+            consulta = "INSERT INTO `pedidos` (`idPedido`, `clientePedido`, `fechaPedido`)"
+                    + " VALUES ('" + p.getIdPedido()+"', '"+p.getClientePedido().getIdCliente() +"', '"+p.getFechaPedido();
+            for (LineaPedido lp : ) {
+                
+            }
+            try {
+                PreparedStatement ps = Conexion.obtener().prepareStatement(consulta);
+                
+                ps.executeUpdate();
+            } catch (ClassNotFoundException | SQLException e) {
+                System.out.println(e.toString());
+            }
+        }
+        System.out.println("ARTICULOS exportados a MySQL correctamente");
+    } 
+    
+        
     //<editor-fold defaultstate="fold" desc="MENUS">
-    public void menu() {
+    public void menu() { 
         int Opcion;
         do {
             System.out.println("\n\n\n\n\n\t\t\t\tMENU PRINCIPAL\n");
@@ -304,7 +414,7 @@ public class Tienda2026 implements Serializable {
 //</editor-fold>
     
     //<editor-fold defaultstate="collapsed" desc="PEDIDOS">
-    private String generaIdPedido(String idCliente) {
+    String generaIdPedido(String idCliente) {
         String nuevoId;//variable String para ir construyendo un nuevo idPedido
         //Calculamos en la variable contador cuantos pedidos tiene el cliente asociado
         int contador = 0;
@@ -319,14 +429,18 @@ public class Tienda2026 implements Serializable {
         return nuevoId;
     }
 
-    private void stock(String idArticulo, int unidades) throws StockCero, StockInsuficiente {
-        if (articulos.get(idArticulo).getExistencias() == 0) {
-            throw new StockCero("Cero unidades disponibles del articulo: " + articulos.get(idArticulo).getDescripcion());
+    public void stock(Articulo a, int unidades) throws StockCero, StockInsuficiente {
+        //SE ACTUALIZA EL MÉTODO DE STOCK ENVIANDO DIRECTAMENTE EL ARTICULO COMO OBJETO ENTERO EN LUGAR DEL ID, SE SIMPLIFICA EL CÓDIGO Y SE HACE MÁS ELEGANTE (24/02/2026)
+        //Cuando no quedan unidades lanza esta alarma, dando la info del throw
+        if (a.getExistencias() == 0) {
+            throw new StockCero("0 unidades disponibles de:"
+                    + a.getDescripcion());
         }
-        if (articulos.get(idArticulo).getExistencias() < unidades) {
-            throw new StockInsuficiente("En este momento solo hay " + articulos.get(idArticulo).getExistencias()
-                    + "unidades desponibles del articulo: " + articulos.get(idArticulo).getDescripcion());
 
+        //Cuando nos piden más unidades de las que tenemos lanzamos esta excepción
+        if (a.getExistencias() < unidades) {
+            throw new StockInsuficiente("Sólo hay " + a.getExistencias() + " unidades disponibles de: "
+                    + a.getDescripcion());
         }
 
     }
@@ -485,6 +599,7 @@ public class Tienda2026 implements Serializable {
         System.out.println("Filtrar artículos con stock superior a un valor dado");
         int n = sc.nextInt();
         articulos.values().stream()
+                
                 .filter(a -> a.getExistencias() > n) //para un valor inferior, habría que usar:".filter(a-> a.getExistencias() < n)"
                 .forEach(a -> System.out.println(a));
 
@@ -1729,5 +1844,162 @@ public class Tienda2026 implements Serializable {
     
 //</editor-fold>
 
+    //<editor-fold defaultstate="collapsed" desc="EJERCICIOS CLASE PARTICULAR">
+    /*
+        public void listaArticulosPorPrecio() {
+        ArrayList<Articulo> aux = new ArrayList<Articulo>();
+        Scanner sc = new Scanner(System.in);
+        System.out.println("SECCION A LISTAR:");
+        int seccion = sc.nextInt();
+        String seccionStr = "";
+        switch (seccion) {
+            case 1:
+                seccionStr = "PERIFERICOS";
+                break;
+            case 2:
+                seccionStr = "ALMACENAMIENTO";
+                break;
+            case 3:
+                seccionStr = "IMPRESORAS";
+                break;
+            case 4:
+                seccionStr = "MONITORES";
+                break;        
+        }
     
+        System.out.println("ARTICULOS DE LA SECCION " + seccionStr + ":");
+        for (Map.Entry<String, Articulo> a : articulos.entrySet()) {
+            Articulo art = a.getValue();
+            if (art.getIdArticulo().startsWith(seccion + "")) {
+                aux.add(art);
+            }
+        }
+        aux.sort(Comparator.comparingDouble(Articulo::getPvp).reversed());
+        for(Articulo art : aux) {
+            System.out.println(art.toString());
+        }
+
+    }
+
+    public void listarPedidosPorId() {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("ID ARTICULO A COMPROBAR:");
+        String idArticulo = sc.nextLine();
+        Articulo art = articulos.get(idArticulo);
+        if (art != null) {
+            String artName = art.getDescripcion();
+            System.out.println("Pedidos en los que se ha vendido MAS de 1 unidad de " + artName);
+            System.out.println("PEDIDO            \tFECHA     \tUNIDADES");
+            for (Pedido p : pedidos) {
+                for (LineaPedido lp : p.getCestaCompra()) {
+                    if (lp.getArticulo().equals(idArticulo) && lp.getUnidades()> 1) {
+                        System.out.println(p.getIdPedido() + "\t" + p.getFechaPedido()+ "\t" + lp.getUnidades());
+                    }
+                }
+            }
+        }
+    }
+
+        public void getArticulosVendidosPorSeccion() {
+            System.out.println("Total de articulos vendidos por SECCION:");
+            System.out.println("----------------------------------------");
+            int contPer = 0;
+            int contAlm = 0;
+            int contImp = 0;
+            int contMon = 0;
+            for (Pedido p : pedidos) {
+                for (LineaPedido lp : p.getCestaCompra()) {
+                    if (lp.getIdArticulo().startsWith("1")) {
+                        contPer++;
+                    }
+                    if (lp.getIdArticulo().startsWith("2")) {
+                        contAlm++;
+                    }
+                    if (lp.getIdArticulo().startsWith("3")) {
+                        contImp++;
+                    }
+                    if (lp.getIdArticulo().startsWith("4")) {
+                        contMon++;
+                    }
+                }
+            }
+            System.out.println("PERIFERICOS: " + contPer);
+            System.out.println("ALMACENAMIENTO: " + contAlm);
+            System.out.println("IMPRESORAS: " + contImp);
+            System.out.println("MONITORES: " + contMon);
+        }
+
+    
+
+    public void getImportesPorSeccion() {
+        System.out.println("Total total vendido por SECCION:");
+        System.out.println("--------------------------------");
+        double contPer = 0.0;
+        double contAlm = 0.0;
+        double contImp = 0.0;
+        double contMon = 0.0;
+        for (Pedido p : pedidos) {
+            for (LineaPedido lp : p.getCestaCompra()) {
+                Articulo art = articulos.get(lp.getArticulo());
+                if (lp.getArticulo().startsWith("1")) {
+                    contPer += art.getPvp()* lp.getUnidades();
+                }
+                if (lp.getArticulo().startsWith("2")) {
+                    contAlm += art.getPvp()* lp.getUnidades();
+                }
+                if (lp.getArticulo().startsWith("3")) {
+                    contImp += art.getPvp()* lp.getUnidades();
+                }
+                if (lp.getArticulo().startsWith("4")) {
+                    contMon += art.getPvp()* lp.getUnidades();
+                }
+            }
+        }
+        System.out.println("PERIFERICOS: " + contPer);
+        System.out.println("ALMACENAMIENTO: " + contAlm);
+        System.out.println("IMPRESORAS: " + contImp);
+        System.out.println("MONITORES: " + contMon);
+    }
+    
+    
+    
+    
+    
+    //Obtén los clientes que tengan un artículo con el nombre 'Bola', y con una fecha de pedido de entre hoy y hace 15 días
+    
+    public ArrayList<Cliente> getClientesFiltrados (String input, String output){ 
+        ArrayList<Cliente> clientes = new ArrayList<Cliente>();
+        //Leer los pedidos desde un fichero input en el que están serializados en un ArrayList de Pedidos
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(output));
+            ObjectInputStream ois = new ObjectInputStream(new FileInputStream(input))) {
+            
+            ArrayList <Pedido> pedidos = (ArrayList<Pedido>)ois.readObject();
+            for (Pedido p : pedidos) {
+                for (LineaPedido l : p.getCestaCompra()) {
+                    if (l.getArticulo().getDescripcion().equals("Bola")){
+                        LocalDate hoy = LocalDate.now();
+                        LocalDate hace15dias = hoy.minusDays(15);
+                        if (p.getFechaPedido().isAfter(hace15dias)){
+                            clientes.add(p.getClientePedido());
+                            bw.write(p.getClientePedido().getNombre() + "," + l.getArticulo().getIdArticulo()
+                                                                      + "," + p.getFechaPedido().toString());
+                        }
+                    }
+                }
+            }
+            clientes.sort(Comparator.comparing(Cliente::getNombre).thenComparing(Cliente::getEdad, 
+                Comparator.reverseOrder())); //al estar el reverse dentro del segundo paréntesis solo ordena del revés la edad
+//(ten en cuenta que en el caso de esta tienda, los clientes no tienen edad)
+        } catch (IOException ex) {
+            System.err.println();
+        } catch (ClassNotFoundException ex) {
+            System.err.println();
+        }
+        
+        return clientes;
+    }
+    
+    //</editor-fold>
+    */
 }
+ 
